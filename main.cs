@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Common;
 using System.Diagnostics;
 using System.Threading.Tasks;
@@ -16,10 +18,29 @@ using F1Simulator.Strategy;
 using F1Simulator.Races;
 using F1Simulator.RaceResults;
 using F1Simulator.Weather;
+using System.Collections.Generic;
+using Newtonsoft.Json;
+using System.ComponentModel.DataAnnotations.Schema;
+using F1Simulator.Abilities;
+// using F1Simulator.Ability;
+using Microsoft.Extensions.DependencyInjection;
+
+// using F1Simulator.Abilities;
 
 
 // dotnet ef migrations add InitialCreate
 //     dotnet ef database update
+
+public class Startup
+{
+    public void ConfigureServices(IServiceCollection services)
+    {
+        services.AddDbContext<SimulatorContext>(options =>
+            options.UseSqlite("Data Source=simulator.db")); // Sau altă configurație specifică
+    }
+}
+
+
 public class SimulatorContext : DbContext
 {
     public DbSet<Pilot> Pilots { get; set; }
@@ -34,16 +55,50 @@ public class SimulatorContext : DbContext
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
-        optionsBuilder.UseSqlite("Data Source=localdatabase.db");
+        optionsBuilder.UseSqlite("Data Source=localdatabase.db")
+            .EnableSensitiveDataLogging();
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        
         modelBuilder.Entity<Pilot>()
             .HasKey(p => p.IDPilot);
+
+
+        modelBuilder.Entity<Ability>()
+            .HasKey(p => p.IDAbility);
+
+        modelBuilder.Entity<Team>()
+            .HasKey(t => t.IDTeam);
+        
+        modelBuilder.Entity<Team>()
+            .HasOne(t => t.Pilot1)
+            .WithMany()
+            .HasForeignKey(t => t.IDPilot1);
+
+        modelBuilder.Entity<Team>()
+            .HasOne(t => t.Pilot2)
+            .WithMany()
+            .HasForeignKey(t => t.IDPilot2);
+        
+
+        
+ 
         modelBuilder.Entity<Pilot>()
-            .HasIndex(p => p.IDPilot)
-            .IsUnique();
+            .HasOne(p => p.Car)
+            .WithMany() 
+            .HasForeignKey(p => p.IDCars); 
+        
+        modelBuilder.Entity<Pilot>()
+            .HasMany(p => p.Abilities)
+            .WithOne(a => a.PilotA)
+            .HasForeignKey(a => a.IDPilot);
+        
+
+        modelBuilder.Entity<Ability>()
+            .ToTable("Abilities");
+        
 
         modelBuilder.Entity<Weather>()
             .HasKey(w => w.IDWeather);
@@ -57,11 +112,13 @@ public class SimulatorContext : DbContext
             .HasIndex(c => c.IDCars)
             .IsUnique();
         
-        modelBuilder.Entity<Team>()
-            .HasKey(t => t.IDTeam);
-        modelBuilder.Entity<Team>()
-            .HasIndex(c => c.IDTeam)
-            .IsUnique();
+        // modelBuilder.Entity<Team>()
+        //     .HasKey(t => t.IDTeam);
+        // modelBuilder.Entity<Team>()
+        //     .HasIndex(c => c.IDTeam)
+        //     .IsUnique();
+
+        
         
         modelBuilder.Entity<Strategies>()
             .HasKey(s => s.IDStrategy);
@@ -92,32 +149,275 @@ public class SimulatorContext : DbContext
         modelBuilder.Entity<RaceResults>()
             .HasIndex(c => c.IDRaceResult)
             .IsUnique();
+
         
-        modelBuilder.Entity<Pilot>()
-            .HasOne(p => p.ATeam)      
-            .WithMany(t => t.Pilots)  
-            .HasForeignKey(p => p.IDTeam); 
         
-        modelBuilder.Entity<Pilot>()
-            .HasOne(p => p.Car)      
-            .WithOne(c => c.APilot)  
-            .HasForeignKey<Pilot>(p => p.IDCars); 
+        
+        
+        
+        // modelBuilder.Entity<Team>()
+        //     .HasMany(t => t.Pilots)
+        //     .WithOne(p => p.ATeam)
+        //     .HasForeignKey(p => p.IDTeam);
+        
+        
+        // modelBuilder.Entity<Pilot>()
+        //     .HasOne(p => p.ATeam)
+        //     .WithMany(t => t.Pilots)
+        //     .HasForeignKey(p => p.IDTeam);
+        
+        // modelBuilder.Entity<Pilot>()
+        //     .HasOne(p => p.ATeam)  // Relația de tipul "Un Pilot aparține unei echipe"
+        //     .WithMany(t => t.Pilots)  // Relația de tipul "O echipă are mulți piloti"
+        //     .HasForeignKey(p => p.IDTeam);
+        
+        
+        
+        
+        
+        
+        
+        
         
         modelBuilder.Entity<Team>()
-            .HasOne(e => e.strategies)
+            .HasOne(t => t.Strategy)
             .WithMany() 
-            .HasForeignKey(e => e.IDStrategy);
+            .HasForeignKey(t => t.IDStrategy) 
+            .IsRequired(false);
+        
+        
 
         modelBuilder.Entity<Races>()
             .HasOne(r => r.Weather)
             .WithMany()
             .HasForeignKey(r => r.IDWeather)
             .OnDelete(DeleteBehavior.Restrict);
+        
+
 
 
         base.OnModelCreating(modelBuilder);
 
 
+        
+        
+        
+        
+        modelBuilder.Entity<Team>().HasData(
+            new Team()
+            {
+                IDTeam = 4500, Budget = 145, Name = "Oracle Red Bull Racing", Manager_First_Name = "Christian", Manager_Last_Name = "Horner",
+                IDPilot1 = 100, IDPilot2 = 101, IDStrategy = null
+            },
+            new Team()
+            {
+                IDTeam = 4501, Budget = 120, Name = "McLaren Formula 1 Team", Manager_First_Name = "Brown", Manager_Last_Name = "Zak",
+                IDPilot1 = 102, IDPilot2 = 103, IDStrategy = null
+            },
+            new Team()
+            {
+                IDTeam = 4502, Budget = 157, Name = "Scuderia Ferrari", Manager_First_Name = "Frédéric", Manager_Last_Name = "Vasseur",
+                IDPilot1 = 104, IDPilot2 = 105, IDStrategy = null
+            },
+            new Team()
+            {
+                IDTeam = 4503, Budget = 148, Name = "Mercedes-AMG PETRONAS F1 Team", Manager_First_Name = "Toto", Manager_Last_Name = "Wolff",
+                IDPilot1 = 106, IDPilot2 = 107, IDStrategy = null
+            },
+            new Team()
+            {
+                IDTeam = 4504, Budget = 139, Name = "Aston Martin Aramco F1 Team", Manager_First_Name = "Mike", Manager_Last_Name = "Krack",
+                IDPilot1 = 108, IDPilot2 = 109, IDStrategy = null
+            },
+            new Team()
+            {
+                IDTeam = 4505, Budget = 136, Name = "Visa Cash App RB Formula One Team", Manager_First_Name = "Jody", Manager_Last_Name = "Egginton",
+                IDPilot1 = 110, IDPilot2 = 111, IDStrategy = null
+            },
+            new Team()
+            {
+                IDTeam = 4506, Budget = 126, Name = "MoneyGram Haas F1 Team", Manager_First_Name = "Ayao", Manager_Last_Name = "Komatsu",
+                IDPilot1 = 112, IDPilot2 = 113, IDStrategy = null
+            },
+            new Team()
+            {
+                IDTeam = 4507, Budget = 134, Name = "BWT Alpine F1 Team", Manager_First_Name = "Oliver", Manager_Last_Name = "Oakes",
+                IDPilot1 = 114, IDPilot2 = 115, IDStrategy = null
+            },
+            new Team()
+            {
+                IDTeam = 4508, Budget = 124, Name = "Williams Racing", Manager_First_Name = "James", Manager_Last_Name = "Vowles",
+                IDPilot1 = 116, IDPilot2 = 117, IDStrategy = null
+            },
+            new Team()
+            {
+                IDTeam = 4509, Budget = 112, Name = "Stake F1 Team Kick Sauber", Manager_First_Name = "Alessandro", Manager_Last_Name = "Alunni Bravi",
+                IDPilot1 = 118, IDPilot2 = 119, IDStrategy = null
+            }
+        );
+        
+        
+        
+        
+
+        
+
+        modelBuilder.Entity<Ability>().HasData(
+            new Ability() { IDAbility = Guid.NewGuid(), abilityName = "Cornering skills", abilityValue = 95, IDPilot = 100},
+            new Ability() { IDAbility = Guid.NewGuid(), abilityName = "Race strategy", abilityValue = 91, IDPilot = 100},
+            new Ability() { IDAbility = Guid.NewGuid(), abilityName = "Physical resistance", abilityValue = 84, IDPilot = 100},
+            new Ability() { IDAbility = Guid.NewGuid(), abilityName = "Car overtaking", abilityValue = 97, IDPilot = 100},
+            new Ability() { IDAbility = Guid.NewGuid(), abilityName = "Tire management", abilityValue = 93, IDPilot = 100},
+            new Ability() { IDAbility = Guid.NewGuid(), abilityName = "Starting reaction", abilityValue = 91, IDPilot = 100},
+            new Ability() { IDAbility = Guid.NewGuid(), abilityName = "Adaptability to weather conditions", abilityValue = 87, IDPilot = 100},
+            
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Cornering skills", abilityValue = 911, IDPilot = 101}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Race strategy", abilityValue = 86, IDPilot = 101}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Physical resistance", abilityValue = 93, IDPilot = 101}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Car overtaking", abilityValue = 89, IDPilot = 101},
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Tire management", abilityValue = 94, IDPilot = 101},
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Starting reaction", abilityValue = 81, IDPilot = 101}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Adaptability to weather conditions", abilityValue = 92, IDPilot = 101},
+            
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Cornering skills", abilityValue = 98, IDPilot = 102}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Race strategy", abilityValue = 84, IDPilot = 102}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Physical resistance", abilityValue = 94, IDPilot = 102}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Car overtaking", abilityValue = 99, IDPilot = 102},
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Tire management", abilityValue = 97, IDPilot = 102}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Starting reaction", abilityValue = 98, IDPilot = 102}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Adaptability to weather conditions", abilityValue = 89, IDPilot = 102},
+            
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Cornering skills", abilityValue = 89, IDPilot = 103}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Race strategy", abilityValue = 92, IDPilot = 103}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Physical resistance", abilityValue = 95, IDPilot = 103}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Car overtaking", abilityValue = 90, IDPilot = 103},
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Tire management", abilityValue = 97, IDPilot = 103}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Starting reaction", abilityValue = 96, IDPilot = 103}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Adaptability to weather conditions", abilityValue = 95, IDPilot = 103},
+            
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Cornering skills", abilityValue = 98, IDPilot = 104}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Race strategy", abilityValue = 88, IDPilot = 104}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Physical resistance", abilityValue = 97, IDPilot = 104}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Car overtaking", abilityValue = 85, IDPilot = 104},
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Tire management", abilityValue = 97, IDPilot = 104}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Starting reaction", abilityValue = 99, IDPilot = 104}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Adaptability to weather conditions", abilityValue = 95, IDPilot = 104},
+            
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Cornering skills", abilityValue = 94, IDPilot = 105}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Race strategy", abilityValue = 92, IDPilot = 105}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Physical resistance", abilityValue = 99, IDPilot = 105}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Car overtaking", abilityValue = 85, IDPilot = 105},
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Tire management", abilityValue = 92, IDPilot = 105}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Starting reaction", abilityValue = 97, IDPilot = 105}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Adaptability to weather conditions", abilityValue = 84, IDPilot = 105},
+            
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Cornering skills", abilityValue = 87, IDPilot = 106}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Race strategy", abilityValue = 84, IDPilot = 106}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Physical resistance", abilityValue = 98, IDPilot = 106}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Car overtaking", abilityValue = 93, IDPilot = 106},
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Tire management", abilityValue = 81, IDPilot = 106}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Starting reaction", abilityValue = 97, IDPilot = 106}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Adaptability to weather conditions", abilityValue = 92, IDPilot = 106},
+            
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Cornering skills", abilityValue = 97, IDPilot = 107}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Race strategy", abilityValue = 82, IDPilot = 107}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Physical resistance", abilityValue = 94, IDPilot = 107}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Car overtaking", abilityValue = 88, IDPilot = 107},
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Tire management", abilityValue = 81, IDPilot = 107}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Starting reaction", abilityValue = 99, IDPilot = 107}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Adaptability to weather conditions", abilityValue = 91, IDPilot = 107},
+            
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Cornering skills", abilityValue = 91, IDPilot = 108}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Race strategy", abilityValue = 79, IDPilot = 108}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Physical resistance", abilityValue = 96, IDPilot = 108}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Car overtaking", abilityValue = 78, IDPilot = 108},
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Tire management", abilityValue = 82, IDPilot = 108}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Starting reaction", abilityValue = 81, IDPilot = 108}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Adaptability to weather conditions", abilityValue = 87, IDPilot = 108},
+            
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Cornering skills", abilityValue = 86, IDPilot = 109}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Race strategy", abilityValue = 73, IDPilot = 109}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Physical resistance", abilityValue = 99, IDPilot = 109}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Car overtaking", abilityValue = 80, IDPilot = 109},
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Tire management", abilityValue = 75, IDPilot = 109}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Starting reaction", abilityValue = 80, IDPilot = 109}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Adaptability to weather conditions", abilityValue = 83, IDPilot = 109},
+            
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Cornering skills", abilityValue = 82, IDPilot = 110}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Race strategy", abilityValue = 64, IDPilot = 110}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Physical resistance", abilityValue = 90, IDPilot = 110}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Car overtaking", abilityValue = 54, IDPilot = 110},
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Tire management", abilityValue = 79, IDPilot = 110}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Starting reaction", abilityValue = 75, IDPilot = 110}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Adaptability to weather conditions", abilityValue = 83, IDPilot = 110},
+            
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Cornering skills", abilityValue = 85, IDPilot = 111}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Race strategy", abilityValue = 69, IDPilot = 111}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Physical resistance", abilityValue = 94, IDPilot = 111}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Car overtaking", abilityValue = 58, IDPilot = 111},
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Tire management", abilityValue = 71, IDPilot = 111}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Starting reaction", abilityValue = 62, IDPilot = 111}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Adaptability to weather conditions", abilityValue = 73, IDPilot = 111},
+            
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Cornering skills", abilityValue = 81, IDPilot = 112}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Race strategy", abilityValue = 62, IDPilot = 112}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Physical resistance", abilityValue = 91, IDPilot = 112}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Car overtaking", abilityValue = 43, IDPilot = 112},
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Tire management", abilityValue = 49, IDPilot = 112}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Starting reaction", abilityValue = 52, IDPilot = 112}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Adaptability to weather conditions", abilityValue = 82, IDPilot = 112},
+            
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Cornering skills", abilityValue = 87, IDPilot = 113}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Race strategy", abilityValue = 65, IDPilot = 113}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Physical resistance", abilityValue = 86, IDPilot = 113}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Car overtaking", abilityValue = 54, IDPilot = 113},
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Tire management", abilityValue = 42, IDPilot = 113}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Starting reaction", abilityValue = 46, IDPilot = 113}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Adaptability to weather conditions", abilityValue = 55, IDPilot = 113},
+            
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Cornering skills", abilityValue = 82, IDPilot = 114}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Race strategy", abilityValue = 69, IDPilot = 114}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Physical resistance", abilityValue = 94, IDPilot = 114}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Car overtaking", abilityValue = 59, IDPilot = 114},
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Tire management", abilityValue = 65, IDPilot = 114}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Starting reaction", abilityValue = 41, IDPilot = 114}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Adaptability to weather conditions", abilityValue = 52, IDPilot = 114},
+            
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Cornering skills", abilityValue = 85, IDPilot = 115}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Race strategy", abilityValue = 61, IDPilot = 115}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Physical resistance", abilityValue = 93, IDPilot = 115}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Car overtaking", abilityValue = 73, IDPilot = 115},
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Tire management", abilityValue = 59, IDPilot = 115}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Starting reaction", abilityValue = 63, IDPilot = 115}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Adaptability to weather conditions", abilityValue = 92, IDPilot = 115},
+            
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Cornering skills", abilityValue = 91, IDPilot = 116}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Race strategy", abilityValue = 62, IDPilot = 116}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Physical resistance", abilityValue = 83, IDPilot = 116}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Car overtaking", abilityValue = 46, IDPilot = 116},
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Tire management", abilityValue = 55, IDPilot = 116}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Starting reaction", abilityValue = 62, IDPilot = 116}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Adaptability to weather conditions", abilityValue = 77, IDPilot = 116},
+            
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Cornering skills", abilityValue = 74, IDPilot = 117}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Race strategy", abilityValue = 61, IDPilot = 117}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Physical resistance", abilityValue = 97, IDPilot = 117}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Car overtaking", abilityValue = 58, IDPilot = 117},
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Tire management", abilityValue = 52, IDPilot = 117}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Starting reaction", abilityValue = 48, IDPilot = 117}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Adaptability to weather conditions", abilityValue = 59, IDPilot = 117},
+            
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Cornering skills", abilityValue = 79, IDPilot = 118}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Race strategy", abilityValue = 78, IDPilot = 118}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Physical resistance", abilityValue = 86, IDPilot = 118}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Car overtaking", abilityValue = 58, IDPilot = 118},
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Tire management", abilityValue = 43, IDPilot = 118}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Starting reaction", abilityValue = 41, IDPilot = 118}, 
+            new Ability(){ IDAbility = Guid.NewGuid(), abilityName = "Adaptability to weather conditions", abilityValue = 78, IDPilot = 118}
+        );
+        
+        
+        
         modelBuilder.Entity<Cars>().HasData(
             new Cars
             {
@@ -218,208 +518,113 @@ public class SimulatorContext : DbContext
                 IDCars = 1819, model = "Kick Sauber C44 #2", speedMax = 334, accTime = 3.0f, hp = 1005, mass = 800, 
                 fuel = "Benzine", tiresPressure = 20
             }
-            //age experience idteam abilities (dictionar string int), idcar, idpilot, firstname, lastname
-
             
         );
-
+        
+        
+        
+        
+        
+        
         modelBuilder.Entity<Pilot>().HasData(
             new Pilot()
             {
-                idpilot = 100, abilities =
-                {
-                    {"Cornering skills", 95}, {"Race strategy", 91}, {"Physical resistance", 84}, {"Car overtaking", 97},
-                    {"Tire management", 93}, {"Starting reaction", 91}, {"Adaptability to weather conditions", 87}
-                }, age = 27, experience = 9, IDTeam = 4500, IDCars = 1804, firstName = "Max", lastName = "Verstappen"
+                IDPilot = 100, Age = 27, Experience = 9, IDCars = 1804, First_Name = "Max", Last_Name= "Verstappen", IDTeam = 4500
+            },   
+            new Pilot()
+            {
+                IDPilot = 101, Age = 34, Experience = 13, IDCars = 1805, First_Name = "Sergio", Last_Name = "Perez", IDTeam = 4500
+            },
+            //98 84 94 99 97 98 89
+            new Pilot()
+            {  
+                IDPilot = 102, Age = 25, Experience = 5, IDCars = 1806, First_Name = "Lando", Last_Name= "Norris", IDTeam = 4501
             },
             new Pilot()
             {
-                idpilot = 101, abilities =
-                {
-                    {"Cornering skills", 91}, {"Race strategy", 86}, {"Physical resistance", 93}, {"Car overtaking", 89},
-                    {"Tire management", 94}, {"Starting reaction", 81}, {"Adaptability to weather conditions", 92}
-                }, age = 34, experience = 13, IDTeam = 4500, IDCars = 1805, firstName = "Sergio", lastName = "Perez"
+                //89 92 95 90 97 96 95
+                IDPilot = 103, Age = 23, Experience = 4, IDTeam = 4501, IDCars = 1807, First_Name = "Oscar", Last_Name = "Piastri"
             },
             new Pilot()
             {
-                idpilot = 102, abilities =
-                {
-                    {"Cornering skills", 98}, {"Race strategy", 84}, {"Physical resistance", 94}, {"Car overtaking", 99},
-                    {"Tire management", 97}, {"Starting reaction", 98}, {"Adaptability to weather conditions", 89}
-                }, age = 25, experience = 5, IDTeam = 4501, IDCars = 1806, firstName = "Lando", lastName = "Norris"
+                IDPilot = 104, age = 26, experience = 6, IDTeam = 4502, IDCars = 1800, firstName = "Charles", lastName = "Leclerc"
             },
             new Pilot()
             {
-                idpilot = 103, abilities =
-                {
-                    {"Cornering skills", 89}, {"Race strategy", 92}, {"Physical resistance", 95}, {"Car overtaking", 90},
-                    {"Tire management", 97}, {"Starting reaction", 96}, {"Adaptability to weather conditions", 95}
-                }, age = 23, experience = 4, IDTeam = 4501, IDCars = 1807, firstName = "Oscar", lastName = "Piastri"
+                //94 92 99 85 92 97 84
+                IDPilot = 105, Age = 30, Experience = 9, IDTeam = 4502, IDCars = 1801, First_Name = "Carlos", Last_Name = "Sainz"
             },
             new Pilot()
             {
-                idpilot = 104, abilities =
-                {
-                    {"Cornering skills", 96}, {"Race strategy", 88}, {"Physical resistance", 97}, {"Car overtaking", 85},
-                    {"Tire management", 97}, {"Starting reaction", 99}, {"Adaptability to weather conditions", 95}
-                }, age = 26, experience = 6, IDTeam = 4502, IDCars = 1800, firstName = "Charles", lastName = "Leclerc"
+                //87 84 98 93 81 95 92
+                IDPilot = 106, age = 39, experience = 17, IDTeam = 4503, IDCars = 1802, firstName = "Lewis", lastName = "Hamilton"
             },
             new Pilot()
             {
-                idpilot = 105, abilities =
-                {
-                    {"Cornering skills", 94}, {"Race strategy", 92}, {"Physical resistance", 99}, {"Car overtaking", 85},
-                    {"Tire management", 92}, {"Starting reaction", 97}, {"Adaptability to weather conditions", 84}
-                }, age = 30, experience = 9, IDTeam = 4502, IDCars = 1801, firstName = "Carlos", lastName = "Sainz"
+                //97 82 94 88 81 99 91
+                IDPilot = 107, age = 26, experience = 9, IDTeam = 4503, IDCars = 1803, firstName = "George", lastName = "Russell"
             },
             new Pilot()
             {
-                idpilot = 106, abilities =
-                {
-                    {"Cornering skills", 87}, {"Race strategy", 84}, {"Physical resistance", 98}, {"Car overtaking", 93},
-                    {"Tire management", 81}, {"Starting reaction", 95}, {"Adaptability to weather conditions", 92}
-                }, age = 39, experience = 17, IDTeam = 4503, IDCars = 1802, firstName = "Lewis", lastName = "Hamilton"
+                //91 79 96 78 82 84 87
+                IDPilot = 108, age = 43, experience = 19, IDTeam = 4504, IDCars = 1810, firstName = "Fernando", lastName = "Alonso"
             },
             new Pilot()
             {
-                idpilot = 107, abilities =
-                {
-                    {"Cornering skills", 97}, {"Race strategy", 82}, {"Physical resistance", 94}, {"Car overtaking", 88},
-                    {"Tire management", 81}, {"Starting reaction", 99}, {"Adaptability to weather conditions", 91}
-                }, age = 26, experience = 9, IDTeam = 4503, IDCars = 1803, firstName = "George", lastName = "Russell"
+                //86 73 99 80 75 79 81
+                IDPilot = 109, age = 27, experience = 6, IDTeam = 4504, IDCars = 1811, firstName = "Lance", lastName = "Stroll"
             },
             new Pilot()
             {
-                idpilot = 108, abilities =
-                {
-                    {"Cornering skills", 91}, {"Race strategy", 79}, {"Physical resistance", 96}, {"Car overtaking", 78},
-                    {"Tire management", 82}, {"Starting reaction", 84}, {"Adaptability to weather conditions", 87}
-                }, age = 43, experience = 19, IDTeam = 4504, IDCars = 1810, firstName = "Fernando", lastName = "Alonso"
+                //82 64 90 54 79 75 83
+                IDPilot = 110, age = 24, experience = 5, IDTeam = 4505, IDCars = 1814, firstName = "Yuki", lastName = "Tsunoda"
             },
             new Pilot()
             {
-                idpilot = 109, abilities =
-                {
-                    {"Cornering skills", 86}, {"Race strategy", 73}, {"Physical resistance", 99}, {"Car overtaking", 80},
-                    {"Tire management", 75}, {"Starting reaction", 79}, {"Adaptability to weather conditions", 81}
-                }, age = 27, experience = 6, IDTeam = 4504, IDCars = 1811, firstName = "Lance", lastName = "Stroll"
+                // 85 69 94 58 71 62 73
+                IDPilot = 111, age = 35, experience = 12, IDTeam = 4505, IDCars = 1815, firstName = "Daniel", lastName = "Ricciardo"
             },
             new Pilot()
             {
-                idpilot = 110, abilities =
-                {
-                    {"Cornering skills", 82}, {"Race strategy", 64}, {"Physical resistance", 90}, {"Car overtaking", 54},
-                    {"Tire management", 79}, {"Starting reaction", 67}, {"Adaptability to weather conditions", 71}
-                }, age = 24, experience = 5, IDTeam = 4505, IDCars = 1814, firstName = "Yuki", lastName = "Tsunoda"
+                // 81 62 91 43 49 52 67
+                IDPilot = 112, age = 37, experience = 16, IDTeam = 4506, IDCars = 1816, firstName = "Nico", lastName = "Hulkenberg"
             },
             new Pilot()
             {
-                idpilot = 111, abilities =
-                {
-                    {"Cornering skills", 85}, {"Race strategy", 69}, {"Physical resistance", 94}, {"Car overtaking", 58},
-                    {"Tire management", 71}, {"Starting reaction", 62}, {"Adaptability to weather conditions", 73}
-                }, age = 35, experience = 12, IDTeam = 4505, IDCars = 1815, firstName = "Daniel", lastName = "Ricciardo"
+                // 87 65 86 54 42 46 55
+                IDPilot = 113, age = 32, experience = 10, IDTeam = 4506, IDCars = 1817, firstName = "Kevin", lastName = "Magnussen"
             },
             new Pilot()
             {
-                idpilot = 112, abilities =
-                {
-                    {"Cornering skills", 81}, {"Race strategy", 62}, {"Physical resistance", 91}, {"Car overtaking", 43},
-                    {"Tire management", 49}, {"Starting reaction", 52}, {"Adaptability to weather conditions", 67}
-                }, age = 37, experience = 16, IDTeam = 4506, IDCars = 1816, firstName = "Nico", lastName = "Hulkenberg"
+                //82 69 94 59 65 41 52
+                IDPilot = 114, age = 28, experience = 9, IDTeam = 4507, IDCars = 1808, firstName = "Pierre", lastName = "Gasly"
             },
             new Pilot()
             {
-                idpilot = 113, abilities =
-                {
-                    {"Cornering skills", 87}, {"Race strategy", 65}, {"Physical resistance", 86}, {"Car overtaking", 54},
-                    {"Tire management", 42}, {"Starting reaction", 46}, {"Adaptability to weather conditions", 55}
-                }, age = 32, experience = 10, IDTeam = 4506, IDCars = 1817, firstName = "Kevin", lastName = "Magnussen"
+                //85 61 92 52 73 59 63
+                IDPilot = 115, age = 28, experience = 7, IDTeam = 4507, IDCars = 1809, firstName = "Esteban", lastName = "Ocon"
             },
             new Pilot()
             {
-                idpilot = 114, abilities =
-                {
-                    {"Cornering skills", 82}, {"Race strategy", 69}, {"Physical resistance", 94}, {"Car overtaking", 59},
-                    {"Tire management", 65}, {"Starting reaction", 41}, {"Adaptability to weather conditions", 52}
-                }, age = 28, experience = 9, IDTeam = 4507, IDCars = 1808, firstName = "Pierre", lastName = "Gasly"
+                //92 62 83 46 55 62 77
+                IDPilot = 116, age = 28, experience = 10, IDTeam = 4508, IDCars = 1812, firstName = "Alexander", lastName = "Albon"
             },
             new Pilot()
             {
-                idpilot = 115, abilities =
-                {
-                    {"Cornering skills", 85}, {"Race strategy", 61}, {"Physical resistance", 92}, {"Car overtaking", 52},
-                    {"Tire management", 73}, {"Starting reaction", 59}, {"Adaptability to weather conditions", 63}
-                }, age = 28, experience = 7, IDTeam = 4507, IDCars = 1809, firstName = "Esteban", lastName = "Ocon"
+                //74 61 97 58 52 48 50
+                IDPilot = 117, age = 21, experience = 3, IDTeam = 4508, IDCars = 1813, firstName = "Franco", lastName = " Colapinto"
             },
             new Pilot()
             {
-                idpilot = 116, abilities =
-                {
-                    {"Cornering skills", 92}, {"Race strategy", 62}, {"Physical resistance", 83}, {"Car overtaking", 46},
-                    {"Tire management", 55}, {"Starting reaction", 62}, {"Adaptability to weather conditions", 77}
-                }, age = 28, experience = 10, IDTeam = 4508, IDCars = 1812, firstName = "Alexander", lastName = "Albon"
-            },
-            new Pilot()
-            {
-                idpilot = 117, abilities =
-                {
-                    {"Cornering skills", 74}, {"Race strategy", 61}, {"Physical resistance", 97}, {"Car overtaking", 58},
-                    {"Tire management", 52}, {"Starting reaction", 48}, {"Adaptability to weather conditions", 50}
-                }, age = 21, experience = 3, IDTeam = 4508, IDCars = 1813, firstName = "Franco", lastName = " Colapinto"
-            },
-            new Pilot()
-            {
-                idpilot = 118, abilities =
-                {
-                    {"Cornering skills", 79}, {"Race strategy", 78}, {"Physical resistance", 86}, {"Car overtaking", 58},
-                    {"Tire management", 59}, {"Starting reaction", 81}, {"Adaptability to weather conditions", 80}
-                }, age = 35, experience = 12, IDTeam = 4509, IDCars = 1818, firstName = "Valtteri", lastName = " Bottas"
-            }
+                //79 78 86 58 59 41 78
+                IDPilot = 118, age = 35, experience = 12, IDTeam = 4509, IDCars = 1818, firstName = "Valtteri", lastName = " Bottas"
+            } 
         );
         
-        modelBuilder.Entity<Team>().HasData(
-            new Team()
-            {
-                IDTeam = 4500, pilots = [], budget = 145, Name = "Oracle Red Bull Racing", managerFirstName = "Christian", managerLastName = "Horner"
-            },
-            new Team()
-            {
-                IDTeam = 4501, pilots = [], budget = 120, Name = "McLaren Formula 1 Team", managerLastName = "Brown", managerFirstName = "Zak"
-            },
-            new Team()
-            {
-                IDTeam = 4502, pilots = [], budget = 157, Name = "Scuderia Ferrari", managerFirstName = "Frédéric", managerLastName = "Vasseur"
-            },
-            new Team()
-            {
-                IDTeam = 4503, pilots = [], budget = 148, Name = "Mercedes-AMG PETRONAS F1 Team", managerFirstName = "Toto", managerLastName = "Wolff"
-            },
-            new Team()
-            {
-                IDTeam = 4504, pilots = [], budget = 139, Name = "Aston Martin Aramco F1 Team", managerFirstName = "Mike", managerLastName = "Krack"
-            },
-            new Team()
-            {
-                IDTeam = 4505, pilots = [], budget = 136, Name = "Visa Cash App RB Formula One Team", managerFirstName = "Jody", managerLastName = "Egginton"
-            },
-            new Team()
-            {
-                IDTeam = 4506, pilots = [], budget = 126, Name = "MoneyGram Haas F1 Team", managerFirstName = "Ayao", managerLastName = "Komatsu"
-            },
-            new Team()
-            {
-                IDTeam = 4507, pilots = [], budget = 134, Name = "BWT Alpine F1 Team", managerFirstName = "Oliver", managerLastName = "Oakes"
-            },
-            new Team()
-            {
-                IDTeam = 4508, pilots = [], budget = 124, Name = "Williams Racing", managerFirstName = "James", managerLastName = "Vowles"
-            },
-            new Team()
-            {
-                IDTeam = 4509, pilots = [], budget = 112, Name = "Stake F1 Team Kick Sauber", managerFirstName = "Alessandro", managerLastName = "Alunni Bravi"
-            }
-        );
+        
+        
+        
+        
 
         
         modelBuilder.Entity<Strategies>().HasData(
@@ -446,7 +651,7 @@ public class SimulatorContext : DbContext
         );
 
 //id, length, curbsnumber, difficulty, laps, name
-        modelBuilder.Entity<Team>().HasData(
+        modelBuilder.Entity<Circuits>().HasData(
             new Circuits()
             {
                 IDCircuits = 10, length = 5.7f, curbsNumber = 8, difficulty = 7, laps = 53, name = "Monza"
@@ -466,12 +671,34 @@ public class SimulatorContext : DbContext
             new Circuits()
             {
                 IDCircuits = 14, length = 5.41f, curbsNumber = 19, difficulty = 5, laps = 57, name = "Miami International Autodrome"
+            },
+            new Circuits()
+            {
+                IDCircuits = 15, length = 7.0f, curbsNumber = 19, difficulty = 4, laps = 44, name = "Circuit de Spa-Francorchamps"
+            },
+            new Circuits()
+            {
+                IDCircuits = 16, length = 4.3f, curbsNumber = 17, difficulty = 4, laps = 71, name = "Autódromo Hermanos Rodríguez"
+            },
+            new Circuits()
+            {
+                IDCircuits = 17, length = 6.2f, curbsNumber = 17, difficulty = 5, laps = 50, name = "Las Vegas Strip Circuit"
+            },
+            new Circuits()
+            {
+                IDCircuits = 18, length = 5.28f, curbsNumber = 16, difficulty = 6, laps = 58, name = "Yas Marina Circuit"
+            },
+            new Circuits()
+            {
+                IDCircuits = 19, length = 4.3f, curbsNumber = 15, difficulty = 7, laps = 71, name = "Autódromo José Carlos Pace"
+            },
+            new Circuits()
+            {
+                IDCircuits = 20, length = 4.9f, curbsNumber = 19, difficulty = 8, laps = 63, name = "Autodromo Internazionale Enzo e Dino Ferrari"
             }
         );
-
-
-        //age experience idteam abilities (dictionar string int), idcar, idpilot, firstname, lastname
-
+        base.OnModelCreating(modelBuilder);
+        
     }
 
 }
@@ -484,18 +711,44 @@ namespace F1Simulator
         {
             using (var context = new SimulatorContext())
             {
-                var teams = context.Teams
-                    .Include(t => t.Pilots)
-                    .ThenInclude(p => p.Car) 
-                    .ToList();
-                var pilots = context.Pilots
-                    .ToList();
-                var cars = context.Cars
-                    .ToList();
-                var strategies = context.Strategies
-                    .ToList();
-                var circuits = context.Circuits
-                    .ToList();
+                var teams = context.Teams.ToList();
+                // teams = context.Teams;
+
+                var pilots = context.Pilots;
+                    // .Include(p => p.Abilities);
+
+                var cars = context.Cars;
+                var strategies = context.Strategies;
+                    // .ToList();
+                var circuits = context.Circuits;
+                    // .ToList();
+
+                    //sunny cloudy  rainy snowy
+
+                Weather.Weather weatherConditions = new Weather.Weather();
+                    
+                Console.WriteLine("Select the weather: ");
+                
+                Console.Write("Type of weather (Sunny / Cloudy / Rainy / Snowy): ");
+                string condition = Console.ReadLine();
+                Console.WriteLine("");
+                
+                Console.Write("Humidity level: ");
+                double hum = Double.Parse(Console.ReadLine());
+                Console.Write("Temperature (\u00b0C): ");
+                double temp = Double.Parse(Console.ReadLine());
+                Console.WriteLine("");
+
+                int i = 1;
+                foreach (var strategy in strategies)
+                {
+                    Console.WriteLine($"Strategy number {i}");
+                    Console.WriteLine($"Name of the strategy: {strategy.strategyType}");
+                    Console.WriteLine($"Description of the strategy: {strategy.description}");
+                    Console.WriteLine($"Points of this strategy: {strategy.points}");
+                    Console.WriteLine("");
+                }
+
             }
         }
     }
@@ -516,7 +769,7 @@ namespace F1Simulator.Cars
         private float Mass; //greutate masina
         private string Fuel; //carburant
         private double TiresPressure; //presiune pneuri
-        public Pilot APilot;
+        // public Pilot APilot;
 
         public Cars()
         {
@@ -528,10 +781,10 @@ namespace F1Simulator.Cars
             Mass = 0f;
             Fuel = null;
             TiresPressure = 0;
-            APilot = new Pilot();
+            //APilot = new Pilot();
         }
 
-        public Cars(int id, string model, int speedMax, float accTime, int hp, float mass, string fuel, double tiresPressure, Pilot pilot)
+        public Cars(int id, string model, int speedMax, float accTime, int hp, float mass, string fuel, double tiresPressure)
         {
             if (!CheckIfLegal())
             {
@@ -545,7 +798,7 @@ namespace F1Simulator.Cars
             Mass = mass;
             Fuel = fuel;
             TiresPressure = tiresPressure;
-            APilot = pilot;
+            // APilot = pilot;
         }
 
         public int hp
@@ -572,11 +825,11 @@ namespace F1Simulator.Cars
             set { TiresPressure = value; }
         }
 
-        public Pilot pilot
-        {
-            get { return APilot; }
-            set { APilot = value; }
-        }
+        // public Pilot pilot
+        // {
+        //     get { return APilot; }
+        //     set { APilot = value; }
+        // }
 
         public string model
         {
@@ -618,20 +871,70 @@ namespace F1Simulator.Cars
 
 
 
+
+
+
+namespace F1Simulator.Abilities
+{
+    public class Ability
+    {
+        public Guid IDAbility { get; set; }
+        public string AbilityName { get; set; }
+        public int AbilityValue { get; set; }
+
+        public int IDPilot;
+        public Pilot PilotA;
+        public Ability()
+        {
+            IDAbility = new Guid();
+            AbilityName = "";
+            AbilityValue = 0;
+        }
+
+        public Ability(string abilityName, int abilityValue)
+        {
+            AbilityName = abilityName;
+            AbilityValue = abilityValue;
+        }
+
+        public string abilityName
+        {
+            get { return AbilityName; }
+            set { AbilityName = value; }
+        }
+
+        public int abilityValue
+        {
+            get { return AbilityValue; }
+            set { AbilityValue = value; }
+        }
+    }
+}
+
+
 namespace F1Simulator.Pilots
 {
-    public class Pilot : IComparable<Pilot>
+    public class Pilot 
     {
         public int IDPilot;
-        private string First_Name;
-        private string Last_Name;
-        private int Age;
-        private int Experience;
+        public string First_Name;
+        public string Last_Name;
+        public int Age;
+        public int Experience;
+        
         public int IDTeam;
         public Team ATeam;
-        private Dictionary<string, int> Abilities;
+        
         public Cars.Cars Car;
         public int IDCars;
+        public ICollection<Ability> Abilities { get; set; } = new List<Ability>();
+        
+
+        // public List<Ability.Ability> abilities
+        // {
+        //     get { return Abilities; }
+        //     set { Abilities = value; }
+        // }
 
         public int age
         {
@@ -645,16 +948,7 @@ namespace F1Simulator.Pilots
             set { Experience = value; }
         }
 
-        public int idteam
-        {
-            get { return IDTeam; }
-        }
-
-        public Dictionary<string, int> abilities
-        {
-            get { return Abilities; }
-            set { Abilities = value; }
-        }
+        
 
         public int idcar
         {
@@ -707,13 +1001,12 @@ namespace F1Simulator.Pilots
             Last_Name = "Unknown";
             Age = 0;
             Experience = 0;
-            ATeam = new Team();
-            Abilities = new Dictionary<string, int>();
-            Car = new Cars.Cars();
+            Abilities = new List<Ability>();
+            Car = null;
         }
 
         public Pilot(int id, string firstName, string lastName, int age, int experience, Team aTeam,
-            Dictionary<string, int> abilities, Cars.Cars car)
+            Dictionary<string, int> abilities, Cars.Cars car, Dictionary<string, int> abilitiesList)
         {
             IDPilot = id;
             First_Name = firstName;
@@ -721,7 +1014,7 @@ namespace F1Simulator.Pilots
             Age = age;
             Experience = experience;
             ATeam = aTeam;
-            Abilities = abilities;
+            Abilities = Abilities;
             Car = car;
         }
 
@@ -729,6 +1022,12 @@ namespace F1Simulator.Pilots
         {
             return Experience;
         }
+
+        // public Ability abilities
+        // {
+        //     get { return Abilities; }
+        //     set { Abilities = value; }
+        // }
         
 
         public int SumAbilities()
@@ -736,7 +1035,7 @@ namespace F1Simulator.Pilots
             int sum = 0;
             foreach (var ability in Abilities)
             {
-                sum += ability.Value;
+                sum += ability.abilityValue;
             }
 
             return sum;
@@ -756,37 +1055,56 @@ namespace F1Simulator.Pilots
 
 namespace F1Simulator.Teams
 {
-    public class Team: IEnumerable<Pilot>
+    public class Team 
     {
         public int IDTeam;
         public string Name;
-        public List<Pilot> Pilots;
-        private int Budget;
-        private string Manager_First_Name;
-        private string Manager_Last_Name;
-        private Strategies Strategy;
-        public int IDStrategy;
+        
+        public int IDPilot1;
+        public Pilot Pilot1;
+        public int IDPilot2;
+        public Pilot Pilot2;
+        
+        public int Budget;
+        public string Manager_First_Name;
+        public string Manager_Last_Name;
+        
+        public Strategies Strategy;
+        public int? IDStrategy;
+
+        // public ICollection<Pilot> pilots
+        // {
+        //     get { return Pilots; }
+        //     set { Pilots = value; }
+        // }
+        
 
         public Team()
         {
             IDTeam = new int();
-            Pilots = new List<Pilot>();
+            IDPilot1 = 0;
+            IDPilot2 = 0;
+            Pilot1 = new Pilot();
+            Pilot2 = new Pilot();
             Budget = 0;
             Manager_First_Name = "Unknown";
             Manager_Last_Name = "Unknown";
             Strategy = new Strategies();
             Name = "Unknown";
+            IDStrategy = 0;
         }
 
-        public Team(int id, List<Pilot> pilots, int budget, string managerFirstName, string managerLastName, Strategies strategies, string name)
+        public Team(int id, Pilot pilot1, Pilot pilot2, int budget, string managerFirstName, string managerLastName, Strategies strategies, string name, int idStrategy)
         {
             IDTeam = id;
-            Pilots = pilots;
+            Pilot1 = pilot1;
+            Pilot2 = pilot2;
             Budget = budget;
             Manager_First_Name = managerFirstName;
             Manager_Last_Name = managerLastName;
             Strategy = strategies;
             Name = name;
+            IDStrategy = idStrategy;
         }
 
         public Strategies strategy
@@ -799,12 +1117,6 @@ namespace F1Simulator.Teams
         {
             get { return IDTeam; }
             set { IDTeam = value; }
-        }
-
-        public List<Pilot> pilots
-        {
-            get { return Pilots; }
-            set { Pilots = value; }
         }
 
         public int budget
@@ -833,19 +1145,20 @@ namespace F1Simulator.Teams
 
         public double TeamPerformance()
         {
-            if (Pilots.Count == 0) return 0;
-            return Pilots.Sum(p => p.GetExperience() * p.SumAbilities());
+            return Pilot1.experience * Pilot1.experience + Pilot2.experience * Pilot2.SumAbilities();
         }
+
         
         
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
-        public IEnumerator<Pilot> GetEnumerator()
-        {
-            return Pilots.GetEnumerator();
-        }
+        
+        // System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
+        // {
+        //     return GetEnumerator();
+        // }
+        // public IEnumerator<Pilot> GetEnumerator()
+        // {
+        //     return Pilots.GetEnumerator();
+        // }
     }
 }
 
@@ -1028,7 +1341,6 @@ namespace F1Simulator.Races
                 double strategyWeatherImpact = 0;
                 
 // 10000 = conservative ; 10001 = aggressive ; 10002 = aerodynamic enhancement ; 10003 = fuel optimization ; 10004 = adaptive
-//sunny cloudy  rainy snowy
 
                 if (weatherCondition == "Rainy" || weatherCondition == "Snowy" && teamStrategy.IDStrategy == 10001)
                 {
@@ -1074,7 +1386,7 @@ namespace F1Simulator.Weather
         private string Condition;
         private double Temperature;
         private double Humidity;
-
+// condition temperature humidity
         public Weather()
         {
             IDWeather = 0;
@@ -1095,6 +1407,18 @@ namespace F1Simulator.Weather
         {
             get { return Condition; }
             set { Condition = value; }
+        }
+        
+        public double temperature
+        {
+            get { return Temperature; }
+            set { Temperature = value; }
+        }
+
+        public double humidity
+        {
+            get { return Humidity; }
+            set { Humidity = value; }
         }
         
         public int CalculatePerformanceLevel()
@@ -1151,6 +1475,40 @@ public class DataImporter
     }
 } */
 
+// namespace F1Simulator.Ability
+// {
+//     public class Ability
+//     {
+//         public Guid IDAbilities;
+//         private string AbilityName;
+//         private int AbilityValue;
+//
+//         public Ability()
+//         {
+//             IDAbilities = new Guid();
+//             AbilityName = "";
+//             AbilityValue = 0;
+//         }
+//
+//         public Ability(string abilityName, int abilityValue)
+//         {
+//             AbilityName = abilityName;
+//             AbilityValue = abilityValue;
+//         }
+//
+//         public string abilityName
+//         {
+//             get { return AbilityName; }
+//             set { AbilityName = value; }
+//         }
+//
+//         public int abilityValue
+//         {
+//             get { return AbilityValue; }
+//             set { AbilityValue = value; }
+//         }
+//     }
+// }
 
 namespace F1Simulator.RaceResults
 {
