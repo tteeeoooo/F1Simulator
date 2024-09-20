@@ -16,12 +16,12 @@ using F1Simulator.Equipment;
 using F1Simulator.Circuits;
 using F1Simulator.Strategy;
 using F1Simulator.Races;
-using F1Simulator.RaceResults;
 using F1Simulator.Weather;
 using F1Simulator.Abilities;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.Extensions.Configuration;
 // using F1Simulator.Ability;
@@ -29,21 +29,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 
 
-// public class Startup
-// {
-//     public IConfiguration Configuration { get; }
-//
-//     public Startup(IConfiguration configuration)
-//     {
-//         Configuration = configuration;
-//     }
-//     
-//     public void ConfigureServices(IServiceCollection services)
-//     {
-//         services.AddDbContext<SimulatorContext>(options =>
-//             options.UseSqlite(Configuration.GetConnectionString("DefaultConnection")));
-//     }
-// }
+
 
 
 
@@ -60,7 +46,6 @@ public class SimulatorContext : DbContext
     public DbSet<Circuits> Circuits { get; set; }
     public DbSet<Equipments> Equipments { get; set; }
     public DbSet<Races> Races { get; set; }
-    public DbSet<RaceResults> RaceResults { get; set; }
     public DbSet<Weather> Weather { get; set; }
     public DbSet<Ability> Abilities { get; set; }
 
@@ -99,39 +84,53 @@ public class SimulatorContext : DbContext
         
         modelBuilder.Entity<Races>()
             .HasKey(r => r.IDRace);
-        
-        modelBuilder.Entity<RaceResults>()
-            .HasKey(rr => rr.IDRaceResult);
+
         
 
         
         
-        modelBuilder.Entity<Team>()
-            .HasOne(t => t.Pilot1)
-            .WithMany()
-            .HasForeignKey(t => t.IDPilot1)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<Team>()
-            .HasOne(t => t.Pilot2)
-            .WithMany()
-            .HasForeignKey(t => t.IDPilot2)
-            .OnDelete(DeleteBehavior.Restrict);
- 
+        
+        modelBuilder.Entity<Ability>()
+            .HasOne(a => a.PilotA)
+            .WithMany(p => p.Abilities)
+            .HasForeignKey(a => a.IDPilot);
+        
         modelBuilder.Entity<Pilot>()
             .HasOne(p => p.Car)
             .WithMany() 
-            .HasForeignKey(p => p.IDCars); 
+            .HasForeignKey(p => p.IDCars);
         
-        modelBuilder.Entity<Ability>()
-            .HasOne(a => a.PilotA)  
-            .WithMany(p => p.Abilities)  
-            .HasForeignKey(a => a.IDPilot);
+        modelBuilder.Entity<Pilot>()
+            .HasOne(p => p.ATeam)
+            .WithMany()
+            .HasForeignKey(p => p.IDTeam);
+        
+        
+        
         
         modelBuilder.Entity<Team>()
-            .HasOne(t => t.Strategy) 
-            .WithMany()            
-            .HasForeignKey(t => t.strategiesIDStrategy); 
+            .HasMany(t => t.Pilots)
+            .WithOne(p => p.ATeam)
+            .HasForeignKey(p => p.IDTeam);
+        
+        
+        // modelBuilder.Entity<Team>()
+        //     .HasOne(t => t.Pilot1)
+        //     .WithMany()  
+        //     .HasForeignKey(t => t.IDPilot1)
+        //     .OnDelete(DeleteBehavior.Restrict); 
+        //
+        // modelBuilder.Entity<Team>()
+        //     .HasOne(t => t.Pilot2)
+        //     .WithMany()  
+        //     .HasForeignKey(t => t.IDPilot2)
+        //     .OnDelete(DeleteBehavior.Restrict);
+        
+        modelBuilder.Entity<Team>()
+            .HasOne(t => t.Strategy)
+            .WithMany()  
+            .HasForeignKey(t => t.strategiesIDStrategy)
+            .OnDelete(DeleteBehavior.Restrict);
         
         modelBuilder.Entity<Races>()
             .HasOne(r => r.Weather)
@@ -230,7 +229,6 @@ namespace F1Simulator
                     try
                     {
                         context.SaveChanges();
-                        Console.WriteLine("Hello world");
                     }
                     catch (DbUpdateException ex)
                     {
@@ -241,6 +239,7 @@ namespace F1Simulator
                 
                 
                 
+
                 
                 
                 Strategies strategy1 = new Strategies()
@@ -398,6 +397,8 @@ namespace F1Simulator
                         car18, car19, car20);
                     context.SaveChanges();
                 }
+                
+                
                 
                 
                 Pilot pilot1 = new Pilot()
@@ -673,6 +674,8 @@ namespace F1Simulator
                 }
                 
                 
+                
+                
                 if (!context.Abilities.Any())
                 {
                     context.Abilities.AddRange(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15, a16,
@@ -683,6 +686,7 @@ namespace F1Simulator
                         a110, a111, a112, a113, a114, a115, a116, a117, a118, a119, a120, a121, a122, a123, a124, a125, a126, a127, a128, a129, a130, a131, a132, a133, a134, a135, a136, a137, a138, a139, a140
                     );
                 }
+
                 
                 
 
@@ -697,118 +701,126 @@ namespace F1Simulator
                 {
                     IDTeam = 4500, Budget = 145, Name = "Oracle Red Bull Racing",
                     Manager_First_Name = "Christian", Manager_Last_Name = "Horner",
-                    IDPilot1 = pilot1.IDPilot, IDPilot2 = pilot2.IDPilot,
-                    strategiesIDStrategy = null
+                    strategiesIDStrategy = strategy1.strategiesIDStrategy
                 };
                 Team team2 = new Team()
                 {
                     IDTeam = 4501, Budget = 120, Name = "McLaren Formula 1 Team", Manager_First_Name = "Brown",
-                    Manager_Last_Name = "Zak",
-                    IDPilot1 = pilot3.IDPilot, IDPilot2 = pilot4.IDPilot, strategiesIDStrategy = 10000
+                    Manager_Last_Name = "Zak",strategiesIDStrategy = strategy1.strategiesIDStrategy
                 };
                 Team team3 = new Team()
                 {
                     IDTeam = 4502, Budget = 157, Name = "Scuderia Ferrari", Manager_First_Name = "Frédéric",
-                    Manager_Last_Name = "Vasseur",IDPilot1 = pilot5.IDPilot, IDPilot2 = pilot6.IDPilot, strategiesIDStrategy = 10000
+                    Manager_Last_Name = "Vasseur" ,strategiesIDStrategy = strategy1.strategiesIDStrategy
                 };
                 Team team4 = new Team()
                 {
                     IDTeam = 4503, Budget = 148, Name = "Mercedes-AMG PETRONAS F1 Team",
-                    Manager_First_Name = "Toto", Manager_Last_Name = "Wolff",IDPilot1 = pilot7.IDPilot, IDPilot2 = pilot8.IDPilot,
-                    strategiesIDStrategy = 10000
-                    // IDPilot1 = 106, IDPilot2 = 107, strategiesIDStrategy = 10000
+                    Manager_First_Name = "Toto", Manager_Last_Name = "Wolff",
+                    strategiesIDStrategy = strategy1.strategiesIDStrategy
                 };
                 Team team5 = new Team()
                 {
                     IDTeam = 4504, Budget = 139, Name = "Aston Martin Aramco F1 Team",
-                    Manager_First_Name = "Mike", Manager_Last_Name = "Krack",IDPilot1 = pilot9.IDPilot, IDPilot2 = pilot10.IDPilot,
-                    strategiesIDStrategy = 10000
+                    Manager_First_Name = "Mike", Manager_Last_Name = "Krack",
+                    strategiesIDStrategy = strategy1.strategiesIDStrategy
                 };
                 Team team6 = new Team()
                 {
                     IDTeam = 4505, Budget = 136, Name = "Visa Cash App RB Formula One Team",
-                    Manager_First_Name = "Jody", Manager_Last_Name = "Egginton", IDPilot1 = pilot11.IDPilot, IDPilot2 = pilot12.IDPilot, strategiesIDStrategy = 10000
-                    // IDPilot1 = 110, IDPilot2 = 111, strategiesIDStrategy = 10000
+                    Manager_First_Name = "Jody", Manager_Last_Name = "Egginton", 
+                    strategiesIDStrategy = strategy1.strategiesIDStrategy
                 };
                 Team team7 = new Team()
                 {
                     IDTeam = 4506, Budget = 126, Name = "MoneyGram Haas F1 Team", Manager_First_Name = "Ayao",
-                    Manager_Last_Name = "Komatsu", IDPilot1 = pilot13.IDPilot, IDPilot2 = pilot14.IDPilot, strategiesIDStrategy = 10000
-                    // IDPilot1 = 112, IDPilot2 = 113, strategiesIDStrategy = 10000
+                    Manager_Last_Name = "Komatsu",
+                    strategiesIDStrategy = strategy1.strategiesIDStrategy
                 };
                 Team team8 = new Team()
                 {
                     IDTeam = 4507, Budget = 134, Name = "BWT Alpine F1 Team", Manager_First_Name = "Oliver",
-                    Manager_Last_Name = "Oakes", IDPilot1 = pilot15.IDPilot, IDPilot2 = pilot16.IDPilot, strategiesIDStrategy = 10000
-                    // IDPilot1 = 114, IDPilot2 = 115, strategiesIDStrategy = 10000
+                    Manager_Last_Name = "Oakes",
+                    strategiesIDStrategy = strategy1.strategiesIDStrategy
                 };
                 Team team9 = new Team()
                 {
                     IDTeam = 4508, Budget = 124, Name = "Williams Racing", Manager_First_Name = "James",
-                    Manager_Last_Name = "Vowles", IDPilot1 = pilot17.IDPilot, IDPilot2 = pilot18.IDPilot, strategiesIDStrategy = 10000
-                    // IDPilot1 = 116, IDPilot2 = 117, strategiesIDStrategy = 10000
+                    Manager_Last_Name = "Vowles", 
+                    strategiesIDStrategy = strategy1.strategiesIDStrategy
                 };
                 Team team10 = new Team()
                 {
                     IDTeam = 4509, Budget = 112, Name = "Stake F1 Team Kick Sauber",
-                    Manager_First_Name = "Alessandro", Manager_Last_Name = "Alunni Bravi", IDPilot1 = pilot19.IDPilot, IDPilot2 = pilot20.IDPilot, strategiesIDStrategy = 10000
-                    // IDPilot1 = 118, IDPilot2 = 119, strategiesIDStrategy = 10000
+                    Manager_First_Name = "Alessandro", Manager_Last_Name = "Alunni Bravi", 
+                    strategiesIDStrategy = strategy1.strategiesIDStrategy
                 };
-                // team1.IDPilot1 = pilot1.IDPilot;
-                // team1.IDPilot2 = pilot2.IDPilot;
-                // team2.IDPilot1 = pilot3.IDPilot;
-                // team2.IDPilot2 = pilot4.IDPilot;
-                // team3.IDPilot1 = pilot5.IDPilot;
-                // team3.IDPilot2 = pilot6.IDPilot;
-                // team4.IDPilot1 = pilot7.IDPilot;
-                // team4.IDPilot2 = pilot8.IDPilot;
-                // team5.IDPilot1 = pilot9.IDPilot;
-                // team5.IDPilot2 = pilot10.IDPilot;
-                // team6.IDPilot1 = pilot11.IDPilot;
-                // team6.IDPilot2 = pilot12.IDPilot;
-                // team7.IDPilot1 = pilot13.IDPilot;
-                // team7.IDPilot2 = pilot14.IDPilot;
-                // team8.IDPilot1 = pilot15.IDPilot;
-                // team8.IDPilot2 = pilot16.IDPilot;
-                // team9.IDPilot1 = pilot17.IDPilot;
-                // team9.IDPilot2 = pilot18.IDPilot;
-                // team10.IDPilot1 = pilot19.IDPilot;
-                // team10.IDPilot2 = pilot20.IDPilot;
+                
+                
+                team1.strategiesIDStrategy = strategy1.strategiesIDStrategy;
+                team2.strategiesIDStrategy = strategy1.strategiesIDStrategy;
+                team3.strategiesIDStrategy = strategy1.strategiesIDStrategy;
+                team4.strategiesIDStrategy = strategy1.strategiesIDStrategy;
+                team5.strategiesIDStrategy = strategy1.strategiesIDStrategy;
+                team6.strategiesIDStrategy = strategy1.strategiesIDStrategy;
+                team7.strategiesIDStrategy = strategy1.strategiesIDStrategy;
+                team8.strategiesIDStrategy = strategy1.strategiesIDStrategy;
+                team9.strategiesIDStrategy = strategy1.strategiesIDStrategy;
+                team10.strategiesIDStrategy = strategy1.strategiesIDStrategy;
+                
+                
+                
+                pilot1.IDTeam = team1.IDTeam;
+                pilot2.IDTeam = team1.IDTeam;
+                pilot3.IDTeam = team2.IDTeam;
+                pilot4.IDTeam = team2.IDTeam;
+                pilot5.IDTeam = team3.IDTeam;
+                pilot6.IDTeam = team3.IDTeam;
+                pilot7.IDTeam = team4.IDTeam;
+                pilot8.IDTeam = team4.IDTeam;
+                pilot9.IDTeam = team5.IDTeam;
+                pilot10.IDTeam = team5.IDTeam;
+                pilot11.IDTeam = team6.IDTeam;
+                pilot12.IDTeam = team6.IDTeam;
+                pilot13.IDTeam = team7.IDTeam;
+                pilot14.IDTeam = team7.IDTeam;
+                pilot15.IDTeam = team8.IDTeam;
+                pilot16.IDTeam = team8.IDTeam;
+                pilot17.IDTeam = team9.IDTeam;
+                pilot18.IDTeam = team9.IDTeam;
+                pilot19.IDTeam = team10.IDTeam;
+                pilot20.IDTeam = team10.IDTeam;
+
 
                 if (!context.Teams.Any())
                 {
                     context.Teams.AddRange(team1, team2, team3, team4, team5, team6, team7, team8, team9, team10);
-                    try
-                    {
-                        context.SaveChanges();
-                    }
-                    catch (DbUpdateException ex)
-                    {
-                        Console.WriteLine($"Error: {ex.InnerException?.Message ?? ex.Message}");
-                    }
+                    context.SaveChanges();
                 }
-                
-
 
                 
 
 
+                
 
-                var teams = context.Teams.ToList();
-                Console.WriteLine(teams.Count);
-                var pilots = context.Pilots.Include(p => p.Abilities);
+
+
+                var pilots = context.Pilots.Include(p => p.Abilities).ToList();
+                var abilities = context.Pilots.ToList();
                 var cars = context.Cars.ToList();
                 var strategies = context.Strategies.ToList();
                 var circuits = context.Circuits.ToList();
+                var teams = context.Teams.ToList();
 
+                
+                
                 var race = new Races.Races();
-                race.IDCircuit = null;
-
+                race.Teams = teams;
+                race.Pilots = pilots;
                 Weather.Weather weatherConditions = new Weather.Weather();
                     
                 Console.WriteLine("Select the weather: ");
-                
-                Console.Write("Type of weather (Sunny / Cloudy / Rainy / Snowy): ");
+                Console.Write("Type of weather (Sunny / Cloudy / Rainy / Snowy / Windy): ");
                 string condition = Console.ReadLine();
                 Console.WriteLine("");
                 
@@ -841,23 +853,41 @@ namespace F1Simulator
                 
 
                 int i = 1;
-                foreach (var strategy in strategies)
+                foreach (Strategies strategy in strategies)
                 {
                     Console.WriteLine($"Strategy number {i++}");
                     Console.WriteLine($"Name of the strategy: {strategy.StrategyType}");
                     Console.WriteLine($"Description of the strategy: {strategy.Description}");
                     Console.WriteLine($"Points of this strategy: {strategy.Points}");
                     Console.WriteLine("");
+                    if (i == 6) break;
                 }
                 
                 Console.WriteLine("For each team, choose the index of a strategy to be adopted: ");
-                foreach (var team in teams)
+                foreach (Team team in teams)
                 {
                     Console.WriteLine($"Team name: {team.Name}");
                     input = Console.ReadLine();
                     intInput = int.Parse(input);
                     team.strategiesIDStrategy = strategies[intInput].strategiesIDStrategy;
                 }
+                
+                Console.WriteLine("Teams ranking");
+                var simulationResult = race.SimulateRace().ToList();
+                i = 1;
+                foreach (var simulation in simulationResult)
+                {
+                    Console.WriteLine($"{i++}: {simulation.Name}");
+                }
+
+                Console.WriteLine("Pilots ranking");
+                var simulationOrderedPilots = race.OrderedPilots();
+                int k = 1;
+                foreach (var pilot in simulationOrderedPilots)
+                {
+                    Console.WriteLine($"{k++}: {pilot.First_Name} {pilot.Last_Name}");
+                }
+
 
             }
         }
@@ -879,7 +909,6 @@ namespace F1Simulator.Cars
         public float Mass; //greutate masina
         public string Fuel; //carburant
         public double TiresPressure; //presiune pneuri
-        // public Pilot APilot;
 
         public Cars()
         {
@@ -891,7 +920,6 @@ namespace F1Simulator.Cars
             Mass = 0f;
             Fuel = null;
             TiresPressure = 0;
-            //APilot = new Pilot();
         }
 
         public Cars(int id, string model, int speedMax, float accTime, int hp, float mass, string fuel, double tiresPressure)
@@ -908,7 +936,6 @@ namespace F1Simulator.Cars
             Mass = mass;
             Fuel = fuel;
             TiresPressure = tiresPressure;
-            // APilot = pilot;
         }
 
         public int hp
@@ -935,11 +962,6 @@ namespace F1Simulator.Cars
             set { TiresPressure = value; }
         }
 
-        // public Pilot pilot
-        // {
-        //     get { return APilot; }
-        //     set { APilot = value; }
-        // }
 
         public string model
         {
@@ -1006,18 +1028,9 @@ namespace F1Simulator.Abilities
             AbilityName = AbilityName;
             AbilityValue = AbilityValue;
         }
-
-        // public string AbilityName
-        // {
-        //     get { return AbilityName; }
-        //     set { AbilityName = value; }
-        // }
-        //
-        // public int AbilityValue
-        // {
-        //     get { return AbilityValue; }
-        //     set { AbilityValue = value; }
-        // }
+        
+        public virtual void Apply(Pilot pilot) { }
+        
     }
 }
 
@@ -1038,38 +1051,8 @@ namespace F1Simulator.Pilots
         public Cars.Cars Car { get; set; }
         public int IDCars { get; set; }
         public ICollection<Ability>? Abilities { get; set; }
-        
 
-        // public List<Ability.Ability> abilities
-        // {
-        //     get { return Abilities; }
-        //     set { Abilities = value; }
-        // }
 
-        // public int age
-        // {
-        //     get { return Age; }
-        //     set { Age = value; }
-        // }
-        //
-        // public int experience
-        // {
-        //     get { return Experience; }
-        //     set { Experience = value; }
-        // }
-        //
-        //
-        //
-        // public int idcar
-        // {
-        //     get { return IDCars; }
-        // }
-
-        // public int idpilot
-        // {
-        //     get { return IDPilot; }
-        //     set { IDPilot = value; }
-        // }
 
         
 
@@ -1105,11 +1088,6 @@ namespace F1Simulator.Pilots
             return Experience;
         }
 
-        // public Ability abilities
-        // {
-        //     get { return Abilities; }
-        //     set { Abilities = value; }
-        // }
         
 
         public int SumAbilities()
@@ -1130,27 +1108,25 @@ namespace F1Simulator.Pilots
             return -1;
         }
 
-        // public bool Equals(object obj) => Equals(obj as Pilot);
-        // public override int GetHashCode() => (First_Name, Experience).GetHashCode();
     }
 }
 
 namespace F1Simulator.Teams
 {
-    public class Team 
+
+    
+    public class Team
     {
         public int IDTeam { get; set; }
         public string Name { get; set; }
-        
-        public int? IDPilot1 { get; set; }
-        public Pilot? Pilot1 { get; set; }
-        public int? IDPilot2 { get; set; }
-        public Pilot? Pilot2 { get; set; }
-        
+
         public int Budget { get; set; }
+        public ICollection<Pilot> Pilots { get; set; }
+        
+
         public string Manager_First_Name { get; set; }
         public string Manager_Last_Name { get; set; }
-        
+
         public int? strategiesIDStrategy { get; set; }
         public Strategies? Strategy { get; set; }
 
@@ -1159,15 +1135,15 @@ namespace F1Simulator.Teams
         //     get { return Pilots; }
         //     set { Pilots = value; }
         // }
-        
+
 
         public Team()
         {
             IDTeam = new int();
-            IDPilot1 = 0;
-            IDPilot2 = 0;
-            Pilot1 = new Pilot();
-            Pilot2 = new Pilot();
+            // IDPilot1 = 0;
+            // IDPilot2 = 0;
+            // Pilot1 = new Pilot();
+            // Pilot2 = new Pilot();
             Budget = 0;
             Manager_First_Name = "Unknown";
             Manager_Last_Name = "Unknown";
@@ -1176,11 +1152,11 @@ namespace F1Simulator.Teams
             strategiesIDStrategy = 0;
         }
 
-        public Team(int id, Pilot pilot1, Pilot pilot2, int budget, string managerFirstName, string managerLastName, Strategies strategies, string name, int idStrategy)
+        public Team(int id, Pilot pilot1, Pilot pilot2, int budget, string managerFirstName, string managerLastName,
+            Strategies strategies, string name, int idStrategy)
         {
             IDTeam = id;
-            Pilot1 = pilot1;
-            Pilot2 = pilot2;
+
             Budget = budget;
             Manager_First_Name = managerFirstName;
             Manager_Last_Name = managerLastName;
@@ -1189,58 +1165,34 @@ namespace F1Simulator.Teams
             strategiesIDStrategy = idStrategy;
         }
 
-        // public Strategies strategy
-        // {
-        //     get { return Strategy; }
-        //     set { Strategy = value; }
-        // }
 
-        // public int idteam
-        // {
-        //     get { return IDTeam; }
-        //     set { IDTeam = value; }
-        // }
-
-        // public int budget
-        // {
-        //     get { return Budget; }
-        //     set { Budget = value; }
-        // }
-
-        // public string managerFirstName
-        // {
-        //     get { return Manager_First_Name; }
-        //     set { Manager_First_Name = value; }
-        // }
-        //
-        // public string managerLastName
-        // {
-        //     get { return Manager_Last_Name; }
-        //     set { Manager_Last_Name = value; }
-        // }
-        //
-        // public Strategies strategies
-        // {
-        //     get { return Strategy; }
-        //     set { Strategy = value; }
-        // }
 
         public double TeamPerformance()
         {
-            return Pilot1.Experience * Pilot1.SumAbilities() + Pilot2.Experience * Pilot2.SumAbilities();
-        }
+            int s = 0;
+            foreach (var pilot in Pilots)
+            {
+                s += pilot.Experience * pilot.SumAbilities();
+            }
 
+            return s;
+        }
         
         
+        public void ExecuteStrategy()
+        {
+            if (Strategy != null)
+            {
+                // Folosim StrategyFactory pentru a alege comportamentul corect
+                IStrategy strategyBehavior = StrategyFactory.GetStrategy(Strategy.StrategyType);
+                strategyBehavior.ExecuteStrategy();
+            }
+            else
+            {
+                Console.WriteLine("No strategy assigned to this team.");
+            }
+        }
         
-        // System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
-        // {
-        //     return GetEnumerator();
-        // }
-        // public IEnumerator<Pilot> GetEnumerator()
-        // {
-        //     return Pilots.GetEnumerator();
-        // }
     }
 }
 
@@ -1314,23 +1266,7 @@ namespace F1Simulator.Strategy
             Description = description;
         }
 
-        // public int points
-        // {
-        //     get { return Points; }
-        //     set { Points = value; }
-        // }
-        //
-        // public string strategyType
-        // {
-        //     get { return StrategyType; }
-        //     set { StrategyType = value; }
-        // }
-        //
-        // public string description
-        // {
-        //     get { return Description; }
-        //     set { Description = value; }
-        // }
+
     }
 }
 
@@ -1376,23 +1312,18 @@ namespace F1Simulator.Races
             Weather = weather;
         }
         
-        public List<Team> teams
-        {
-            get { return Teams; }
-            set { Teams = value; }
-        }
         
         public List<Team> SimulateRace()
         {
             List<Tuple<Team, double>> results = new List<Tuple<Team, double>>();
             
-            foreach (Team team in this.teams)
+            foreach (Team team in this.Teams)
             {
                 double basePerformance = team.TeamPerformance();
                 int strategyBoost = team.Strategy.Points;
                 int weatherImpact = this.Weather.CalculatePerformanceLevel();
                 
-                string weatherCondition = this.Weather.condition;
+                string weatherCondition = this.Weather.Condition;
                 Strategies teamStrategy = team.Strategy;
                 double strategyWeatherImpact = 0;
                 
@@ -1424,13 +1355,86 @@ namespace F1Simulator.Races
                 results.Add(new Tuple<Team, double>(team, finalPerformance));
             }
 
-            var RaceResult = results.OrderByDescending(result => result.Item2).ToList();
+            var RaceResult = results.OrderBy(result => result.Item2).ToList();
             
             List<Team> orderedTeams = RaceResult.Select(result => result.Item1).ToList();
 
             return orderedTeams;
 
         }
+        
+        
+        public void AdjustPilotAbilities()
+        {
+            foreach (var pilot in Pilots)
+            {
+                if (Weather.Condition == "Rain")
+                {
+                    foreach (var ability in pilot.Abilities)
+                    {
+                        if (ability.AbilityName == "Adaptability to Weather Conditions")
+                        {
+                            if (ability.AbilityValue <= 50) ability.AbilityValue -= 20; 
+                            else if (ability.AbilityValue <= 85) ability.AbilityValue += 10;
+                            else ability.AbilityValue = 100;
+                        }
+                    }
+                }
+                else if (Weather.Condition == "Sunny")
+                {
+                    foreach (var ability in pilot.Abilities)
+                    {
+                        if (ability.AbilityName == "Speed control")
+                        {
+                            ability.AbilityValue += 5; 
+                        }
+                    }
+                }
+                else if (Weather.Condition == "Windy")
+                {
+                    foreach (var ability in pilot.Abilities)
+                    {
+                        if (ability.AbilityName == "Cornering skills")
+                        {
+                            if (ability.AbilityValue <= 65) ability.AbilityValue -= 15;
+                            else if (ability.AbilityValue <= 100) ability.AbilityValue += 5;
+                            else ability.AbilityValue = 100;
+                        }
+                    }
+                }
+            }
+        }
+
+        public TimeSpan CalculateFinishTime(Pilot pilot)
+        {
+            double baseTime = 100; 
+            double skillAdjustment = pilot.Abilities.Sum(a => a.AbilityValue) / pilot.Abilities.Count;
+
+            double difficultyAdjustment = Circuit.Difficulty * 0.8;
+
+            double finishTime = baseTime - skillAdjustment + difficultyAdjustment;
+    
+            return TimeSpan.FromSeconds(finishTime);
+        }
+
+        public List<Pilot> OrderedPilots()
+        {
+            var pilotsNewOrder = Pilots
+                .Select(pilot => new
+                {
+                    Pilot = pilot,
+                    FinishTime = CalculateFinishTime(pilot)
+                })
+                .OrderBy(result => result.FinishTime)
+                .Select(result => result.Pilot)
+                .ToList();
+
+            return pilotsNewOrder;
+        }
+        
+
+        
+        
     }
 }
 
@@ -1439,10 +1443,10 @@ namespace F1Simulator.Weather
     public class Weather
     {
         public int IDWeather;
-        private string Condition;
-        private double Temperature;
-        private double Humidity;
-// condition temperature humidity
+        public string Condition;
+        public double Temperature;
+        public double Humidity;
+
         public Weather()
         {
             IDWeather = 0;
@@ -1459,32 +1463,17 @@ namespace F1Simulator.Weather
             Humidity = humidity;
         }
 
-        public string condition
-        {
-            get { return Condition; }
-            set { Condition = value; }
-        }
-        
-        public double temperature
-        {
-            get { return Temperature; }
-            set { Temperature = value; }
-        }
-
-        public double humidity
-        {
-            get { return Humidity; }
-            set { Humidity = value; }
-        }
         
         public int CalculatePerformanceLevel()
         {
-            int baseImpact = Condition switch
+            int baseImpact = this.Condition switch
             {
                 "Sunny" => 15,
                 "Cloudy" => 8,
                 "Rainy" => -2,
-                "Snowy" => -12
+                "Snowy" => -12,
+                "Windy" => -4,
+                _ => 0
             };
 
             int temperatureImpact = Temperature > 20 ? 40 : Temperature < 10 ? -5 : 25;
@@ -1500,104 +1489,8 @@ namespace F1Simulator.Weather
 }
 
 
-/*
-public class DataImporter
-{
-    private readonly DbContext _context;
 
-    public DataImporter(DbContext context)
-    {
-        _context = context;
-    }
-    
-    // IDPilot   First_Name  Last_Name  Age  Experience  IDTeam  IDCars
-    public async Task ImportPilots(string filePath)
-    {
-        var pilots = new List<Pilot>();
-        foreach (var line in File.ReadLines(filePath))
-        {
-            var values = line.Split(',');
 
-            if (values.Length >= 5)
-            {
-                var pilot = new Pilot(int.Parse(values[0]), values[1], values[2], int.Parse(values[3]), int.Parse(values[4]),
-                    int.Parse(values[5]), int.Parse(values[6]))
-
-                pilots.Add(pilot);
-            }
-        }
-        _context.Pilots.AddRange(piloti);
-        await _context.SaveChangesAsync();
-    }
-} */
-
-// namespace F1Simulator.Ability
-// {
-//     public class Ability
-//     {
-//         public Guid IDAbilities;
-//         private string AbilityName;
-//         private int AbilityValue;
-//
-//         public Ability()
-//         {
-//             IDAbilities = new Guid();
-//             AbilityName = "";
-//             AbilityValue = 0;
-//         }
-//
-//         public Ability(string AbilityName, int AbilityValue)
-//         {
-//             AbilityName = AbilityName;
-//             AbilityValue = AbilityValue;
-//         }
-//
-//         public string AbilityName
-//         {
-//             get { return AbilityName; }
-//             set { AbilityName = value; }
-//         }
-//
-//         public int AbilityValue
-//         {
-//             get { return AbilityValue; }
-//             set { AbilityValue = value; }
-//         }
-//     }
-// }
-
-namespace F1Simulator.RaceResults
-{
-    public class RaceResults
-    {
-        public Guid IDRaceResult;
-        private List<Pilot> Pilots;
-        private Dictionary<Pilot, double> FinalTime; //timp final pentru fiecare pilot
-
-        public RaceResults()
-        {
-            IDRaceResult = new Guid();
-            Pilots = new List<Pilot>();
-            FinalTime = new Dictionary<Pilot, double>();
-        }
-
-        public RaceResults(List<Pilot> pilots, Dictionary<Pilot, double> finalTime)
-        {
-            IDRaceResult = new Guid();
-            Pilots = pilots;
-            FinalTime = finalTime;
-        }
-        
-
-        public void AddResult(Pilot pilot, double timer)
-        {
-            if (Pilots.Contains(pilot))
-            {
-                FinalTime[pilot] = timer;
-            }
-        }
-    }
-}
 
 namespace F1Simulator.Equipment
 {
@@ -1628,13 +1521,50 @@ namespace F1Simulator.Equipment
 
 
 
-// public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<SimulatorContext>
-// {
-//     public SimulatorContext CreateDbContext(string[] args)
-//     {
-//         var optionsBuilder = new DbContextOptionsBuilder<SimulatorContext>();
-//         optionsBuilder.UseSqlite("Data Source=DefaultConnection.db");
-//
-//         return new SimulatorContext(optionsBuilder.Options);
-//     }
-// }
+
+
+public interface IStrategy
+{
+    void ExecuteStrategy();
+}
+
+public class StrategyFactory
+{
+    public static IStrategy GetStrategy(string strategyType)
+    {
+        return strategyType switch
+        {
+            "Aggressive" => new AggressiveStrategy(),
+            "Conservative" => new ConservativeStrategy(),
+            "Aerodynamic Enhancement" => new AerodynamicEnhancementStrategy(),
+            "Fuel Optimization" => new FuelOptimizationStrategy(),
+            "Adaptive" => new AdaptiveStrategy(),
+            _ => throw new Exception("Unknown strategy")
+        };
+    }
+}
+
+public class ConservativeStrategy : IStrategy
+{
+    public void ExecuteStrategy() { }
+}
+public class AggressiveStrategy : IStrategy
+{
+    public void ExecuteStrategy() { }
+}
+public class AerodynamicEnhancementStrategy : IStrategy
+{
+    public void ExecuteStrategy() { }
+}
+public class FuelOptimizationStrategy : IStrategy
+{
+    public void ExecuteStrategy() { }
+}
+public class AdaptiveStrategy : IStrategy
+{
+    public void ExecuteStrategy() { }
+}
+//conservative    aggressive     Aerodynamic Enhancement   Fuel Optimization    Adaptive
+
+
+
